@@ -34,16 +34,11 @@
 #include "LabMidiCommand.h"
 #include "LabMidiEvent.h"
 
-
-#include "LabMidiOut.h"
 #include "LabMidiSong.h"
 
 #include "LabMidiUtil.h"
 
 #include <stdint.h>
-
-#include "RtMidi.h"
-
 
 namespace Lab {
     
@@ -51,10 +46,9 @@ namespace Lab {
     {
     public:
         
-        Detail(MidiSong* s, MidiOutBase* mo)
+        Detail(MidiSong* s)
         : song(s)
         , startTime(0)
-        , midiOut(mo)
         , eventCursor(0)
         {
             beatsPerMinute = s ? s->startingTempo : 120.0f; // 120 is the standard default value
@@ -69,49 +63,12 @@ namespace Lab {
             
             float newTime = wallclockTime - startTime;
             while (eventCursor < events.size() && events[eventCursor].time <= newTime) {
-                if (midiOut) {
-                    MidiRtEvent& ev = events[eventCursor];
-                    midiOut->command(&ev.command);
-                    
-                    /*
-                    MidiCommand mc;
-                    mc.command = ev.command.command;
-                    mc.byte1 = ev.command.byte1;
-                    mc.byte2 = ev.command.byte2;
-                    */
-           /*
-                    if (nBytes > 1)
-                        mc.byte1 = int(message->at(1));
-                    if (nBytes > 2)
-                        mc.byte2 = int(message->at(2));
-            */        
-                    for (auto i = callbacks.begin(); i != callbacks.end(); ++i)
-                        (*i).second((*i).first, &ev);
-                    
-                    std::cout << ev.time << " " << secondsToTickets(ev.time) << std::endl;
-                                        
-       /*             if (&ev.command) {
-                        
-                        uint8_t command = ev.command.command;
-                        uint8_t byte = ev.command.byte1;
-                        
-                        printf("%s %s \n", Lab::commandName(command), Lab::noteName(byte));
-                        
-                        if (ev.command.command <= 0x9f){
-                            
-                            
-                            uint8_t ct = ev.command.command >> 4;
-                            uint8_t velocity;
-                            
-                            if ((ct != 0xc) && (ct != 0xd)){
-                                velocity = int(ev.command.byte2);
-                            }
-                            printf("velocity %i \n", velocity);
-                        }
-                    }
-        
-        */
-                }
+
+                MidiRtEvent& ev = events[eventCursor];
+                
+                for (auto i = callbacks.begin(); i != callbacks.end(); ++i)
+                    (*i).second((*i).first, &ev);
+                
                 ++eventCursor;
             }
         }
@@ -137,13 +94,11 @@ namespace Lab {
                 beatsPerMinute = 60000000.0f / float(ste->microsecondsPerBeat);
             }
             else if (ev->eventType == MIDI_EventChannel) {
-                if (midiOut) {
-                    ChannelEvent* ce = (ChannelEvent*) ev;
-                    events.push_back(MidiRtEvent(float(now), ce->midiCommand, ce->param1, ce->param2));
-                }
+                ChannelEvent* ce = (ChannelEvent*) ev;
+                events.push_back(MidiRtEvent(float(now), ce->midiCommand, ce->param1, ce->param2));
             }
         }
-
+        
         std::vector<MidiRtEvent> events;
         
         MidiSong* song;
@@ -153,18 +108,16 @@ namespace Lab {
         double ticksPerBeat;
         int eventCursor;
         
-        MidiOutBase* midiOut;
-        
         std::vector<std::pair<void*, MidiEventCallbackFn> > callbacks;
     };
     
-    MidiSongPlayer::MidiSongPlayer(MidiSong* s, MidiOutBase* midiOut)
-    : _detail(new Detail(s, midiOut))
+    MidiSongPlayer::MidiSongPlayer(MidiSong* s)
+    : _detail(new Detail(s))
     {
         if (s) {
             std::vector<MidiTrack*>& tracks = *(s->tracks);
             int tc = tracks.size();
-
+            
             // double, because don't want to introduce sync slip during rendering
             double* nextTime = (double*) alloca(sizeof(double) * tc);
             int* nextIndex = (int*) alloca(sizeof(int) * tc);
@@ -190,7 +143,7 @@ namespace Lab {
                 }
                 if (nt == -1)
                     break;
-
+                
                 MidiEvent* ev = tracks[nt]->events[nextIndex[nt]];
                 _detail->recordEvent(nextTime[nt], ev);
                 ++nextIndex[nt];
@@ -238,5 +191,5 @@ namespace Lab {
                 ++i;
         }
     }
-
+    
 } // Lab

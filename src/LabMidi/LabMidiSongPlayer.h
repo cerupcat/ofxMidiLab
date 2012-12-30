@@ -35,7 +35,6 @@
 
 namespace Lab {
 
-    class MidiOutBase;
     class MidiSong;
     
     struct MidiRtEvent;
@@ -44,7 +43,7 @@ namespace Lab {
     
     class MidiSongPlayer {
     public:
-        MidiSongPlayer(MidiSong*, MidiOutBase*);
+        MidiSongPlayer(MidiSong*);
         ~MidiSongPlayer();
         
         void play(float wallClockTime);
